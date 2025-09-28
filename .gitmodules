@@ -1,0 +1,3 @@
+[submodule "SafeDynamic-Public"]
+	path = SafeDynamic-Public
+	url = https://github.com/SunGodServices/SafeDynamic-Public.git
