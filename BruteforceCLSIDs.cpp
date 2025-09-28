@@ -1,4 +1,4 @@
-#include "BruteforceCLSIDs.h"
+﻿#include "BruteforceCLSIDs.h"
 #include "stdio.h"
 #include "strsafe.h"
 
@@ -10,7 +10,7 @@ void InitConsole(PHANDLE oldStdOut, PHANDLE oldStdErr, PBOOL consoleAllocated) {
 		AllocConsole();
 		*consoleAllocated = TRUE;
 	}
-	HANDLE hStdout = CreateFile(L"CONOUT$", GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+	HANDLE hStdout = CreateFileW(L"CONOUT$", GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
 	SetStdHandle(STD_OUTPUT_HANDLE, hStdout);
 	SetStdHandle(STD_ERROR_HANDLE, hStdout);
 }

@@ -1,4 +1,4 @@
-#define SECURITY_WIN32 
+﻿#define SECURITY_WIN32 
 #pragma comment(lib, "Secur32.lib")
 
 #include "Windows.h"
@@ -63,7 +63,7 @@ int IsTokenSystem(HANDLE hToken, wchar_t *clsid)
 	CopySid(Size, sid, User->User.Sid);
 	UserSize = (sizeof UserName / sizeof * UserName) - 1;
 	DomainSize = (sizeof DomainName / sizeof * DomainName) - 1;
-	LookupAccountSid(NULL, sid, UserName, &UserSize, DomainName, &DomainSize, &SidType);
+	LookupAccountSidW(NULL, sid, UserName, &UserSize, DomainName, &DomainSize, &SidType);
 	//free(sid);
 	//free(User);
 
