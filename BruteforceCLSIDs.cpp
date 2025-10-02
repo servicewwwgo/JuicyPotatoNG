@@ -1,23 +1,28 @@
-﻿#include "BruteforceCLSIDs.h"
+﻿#include "Header.h"
+
+#include "BruteforceCLSIDs.h"
 #include "stdio.h"
 #include "strsafe.h"
 
 void InitConsole(PHANDLE oldStdOut, PHANDLE oldStdErr, PBOOL consoleAllocated) {
-	*oldStdOut = GetStdHandle(STD_OUTPUT_HANDLE);
-	*oldStdErr = GetStdHandle(STD_ERROR_HANDLE);
-	if (GetConsoleWindow() == NULL)
+	
+	*oldStdOut = SPOOFER_CALL(GetStdHandle)(STD_OUTPUT_HANDLE);
+	*oldStdErr = SPOOFER_CALL(GetStdHandle)(STD_ERROR_HANDLE);
+
+	if (SPOOFER_CALL(GetConsoleWindow)() == NULL)
 	{
-		AllocConsole();
+		SPOOFER_CALL(AllocConsole)();
 		*consoleAllocated = TRUE;
 	}
-	HANDLE hStdout = CreateFileW(L"CONOUT$", GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-	SetStdHandle(STD_OUTPUT_HANDLE, hStdout);
-	SetStdHandle(STD_ERROR_HANDLE, hStdout);
+
+	HANDLE hStdout = SPOOFER_CALL(CreateFileW)(L"CONOUT$", GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+	SPOOFER_CALL(SetStdHandle)(STD_OUTPUT_HANDLE, hStdout);
+	SPOOFER_CALL(SetStdHandle)(STD_ERROR_HANDLE, hStdout);
 }
 
 void RestoreStdHandles(HANDLE oldStdOut, HANDLE oldStdErr) {
-	SetStdHandle(STD_OUTPUT_HANDLE, oldStdOut);
-	SetStdHandle(STD_ERROR_HANDLE, oldStdErr);
+	SPOOFER_CALL(SetStdHandle)(STD_OUTPUT_HANDLE, oldStdOut);
+	SPOOFER_CALL(SetStdHandle)(STD_ERROR_HANDLE, oldStdErr);
 }
 
 void getAllClsids(wchar_t* allClsids, DWORD* allClisdsNum) {
@@ -30,24 +35,35 @@ void getAllClsids(wchar_t* allClsids, DWORD* allClisdsNum) {
 	DWORD countRegKeys = 0;
 	size_t offsetAllClsids = 0;
 	DWORD skippedKeys = 0;
-	RegOpenKeyEx(HKEY_CLASSES_ROOT, L"CLSID", 0, KEY_READ, &hKey);
-	do {
-		retCode = RegEnumKey(hKey, countRegKeys, keyName, keyNameLen);
+
+	SPOOFER_CALL(RegOpenKeyExW)(HKEY_CLASSES_ROOT, L"CLSID", 0, KEY_READ, &hKey);
+
+	do 
+	{
+		retCode = SPOOFER_CALL(RegEnumKeyW)(hKey, countRegKeys, keyName, keyNameLen);
 		countRegKeys++;
-		if (keyName[0] != L'{') {
+
+		if (keyName[0] != L'{') 
+		{
 			skippedKeys++;
 			continue;
 		}
-		if (RegGetValue(hKey, keyName, L"APPID", RRF_RT_ANY, NULL, keyValue, &keyValueLen) == ERROR_SUCCESS) {
+		
+		if (SPOOFER_CALL(RegGetValueW)(hKey, keyName, L"APPID", RRF_RT_ANY, NULL, keyValue, &keyValueLen) == ERROR_SUCCESS) 
+		{
 			memcpy(allClsids + offsetAllClsids, keyName, (wcslen(keyName) + 1) * sizeof(WCHAR));
 			offsetAllClsids += wcslen(keyName) + 1;
 		}
 		else
+		{
 			skippedKeys++;
+		}
+
 		keyValueLen = MAX_PATH * sizeof(WCHAR);
 	} while (retCode != ERROR_NO_MORE_ITEMS);
+
 	*allClisdsNum = countRegKeys + 1 - skippedKeys;
-	RegCloseKey(hKey);
+	SPOOFER_CALL(RegCloseKey)(hKey);
 }
 
 void BruteforceAllClisds() {
@@ -61,7 +77,7 @@ void BruteforceAllClisds() {
 	HANDLE hOldStdOut, hOldStdErr;
 	BOOL consoleAllocated = FALSE;
 
-	allClids = (PWCHAR)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, 20000 * MAX_PATH * sizeof(WCHAR));
+	allClids = (PWCHAR)SPOOFER_CALL(HeapAlloc)(SPOOFER_CALL(GetProcessHeap)(), HEAP_ZERO_MEMORY, 20000 * MAX_PATH * sizeof(WCHAR));
 	clsidPtr = allClids;
 	getAllClsids(allClids, &allClidsNum);
 	printf("[*] Bruteforcing %d CLSIDs... \n", allClidsNum);
@@ -69,25 +85,32 @@ void BruteforceAllClisds() {
 	// in this function we take care of the cases in which our current process does not have an allocated console
 	InitConsole(&hOldStdOut, &hOldStdErr, &consoleAllocated);
 
-	do {
-		ZeroMemory(&procInfo, sizeof(PROCESS_INFORMATION));
-		ZeroMemory(&startInfo, sizeof(STARTUPINFO));
-		ZeroMemory(moduleFilename, MAX_PATH);
-		ZeroMemory(newCmdline, MAX_PATH);
-		GetModuleFileName(NULL, moduleFilename, MAX_PATH);
+	do 
+	{
+		memset(&procInfo, 0, sizeof(PROCESS_INFORMATION));
+		memset(&startInfo, 0, sizeof(STARTUPINFO));
+		memset(moduleFilename, 0, MAX_PATH);
+		memset(newCmdline, 0, MAX_PATH);
+		SPOOFER_CALL(GetModuleFileNameW)(NULL, moduleFilename, MAX_PATH);
 		StringCchPrintfW(newCmdline, MAX_PATH, cmdlineTemplate, moduleFilename, L"-c", clsidPtr, L"-z");
-		CreateProcess(moduleFilename, newCmdline, NULL, NULL, FALSE, 0, NULL, NULL, &startInfo, &procInfo);
-		if (WaitForSingleObject(procInfo.hProcess, 1500) == WAIT_TIMEOUT) {
-			TerminateThread(procInfo.hThread, -1);
-			TerminateProcess(procInfo.hProcess, -1);
+		SPOOFER_CALL(CreateProcessW)(moduleFilename, newCmdline, NULL, NULL, FALSE, 0, NULL, NULL, &startInfo, &procInfo);
+		if (SPOOFER_CALL(WaitForSingleObject)(procInfo.hProcess, 1500) == WAIT_TIMEOUT) 
+		{
+			SPOOFER_CALL(TerminateThread)(procInfo.hThread, -1);
+			SPOOFER_CALL(TerminateProcess)(procInfo.hProcess, -1);
 		}
-		CloseHandle(procInfo.hThread);
-		CloseHandle(procInfo.hProcess);
+		SPOOFER_CALL(CloseHandle)(procInfo.hThread);
+		SPOOFER_CALL(CloseHandle)(procInfo.hProcess);
 		clsidPtr += wcslen(clsidPtr) + 1;
 		fflush(stdout);
 	} while (*clsidPtr != L'\0');
 
 	RestoreStdHandles(hOldStdOut, hOldStdErr);
-	if (consoleAllocated) FreeConsole();
-	HeapFree(GetProcessHeap(), 0, allClids);
+
+	if (consoleAllocated)
+	{
+		SPOOFER_CALL(FreeConsole)();
+	}
+		
+	SPOOFER_CALL(HeapFree)(SPOOFER_CALL(GetProcessHeap)(), 0, allClids);
 }

@@ -154,10 +154,17 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="BruteforceCLSIDs.h" />
+    <ClInclude Include="Header.h" />
     <ClInclude Include="IStorageTrigger.h" />
     <ClInclude Include="IUnknownObj.h" />
     <ClInclude Include="PotatoTrigger.h" />
     <ClInclude Include="SSPIHooks.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="ExtraFunction.md">
+      <SubType>
+      </SubType>
+    </None>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

